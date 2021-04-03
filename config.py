@@ -111,9 +111,9 @@ class Config:
     # Requires setting train-sentence-scores, valid-sentence-scores
     binary_level = False
     
-    load_pred_source = None #'checkpoints/'+pre_model_name+'/'+pre_model_name+'_neen.pth'
+    load_pred_source = 'checkpoints/'+pre_model_name+'/'+pre_model_name+'_10_test.pth'
     #load_pred_source = None
-    load_pred_target = None #'checkpoints/'+pre_model_name+'/'+pre_model_name+'_neen.pth'
+    load_pred_target = 'checkpoints/'+pre_model_name+'/'+pre_model_name+'_10_test.pth'
     #load_pred_target = None
 
     # Include start and stop embedding

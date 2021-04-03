@@ -1,6 +1,7 @@
 import torch
 from tqdm import tqdm
 import logging
+import pickle
 
 from models.model import Model
 
@@ -25,6 +26,8 @@ class Trainer:
     def run(self, train_iter, valid_iter, opt):
         self.logger.info(' ')
         self.logger.info('Start Logging...')
+        train_loss = []
+        valid_loss = []
         
         for epoch in range(opt.epochs + 1):
             print('Epoch {} of {}'.format(epoch, opt.epochs))
@@ -32,6 +35,7 @@ class Trainer:
             
             # train
             self.model.train()
+            print(type(self.model))
 
             for batch in tqdm(
                 train_iter,
@@ -51,6 +55,7 @@ class Trainer:
 
                 if self._step % opt.log_interval == 0:
                     self.logger.info("Current Training Loss at step {}: {}".format(self._step, loss_dict['loss']))
+                    train_loss.append(loss_dict['loss'])
             
                 if opt.checkpoint_validation_steps and self._step % opt.checkpoint_validation_steps == 0:
                     # validation
@@ -67,12 +72,18 @@ class Trainer:
                         
                         validation_loss /= len(valid_iter)
                         self.logger.info(" ====== Current Validation Loss at step {}: {} ====== ".format(self._step, validation_loss))
+                        valid_loss.append(validation_loss)
 
                     self.model.train()
                     print('======= Validation Done =======')
             
             if epoch % opt.save_checkpoint_interval == 0:
-                self.model.save(opt.checkpoint_path+'{}_{}.pth'.format(opt.model_name, epoch))
+                self.model.save(opt.checkpoint_path+'{}_{}_test.pth'.format(opt.model_name, epoch))
+        
+        losses = {'train': train_loss, 'valid': valid_loss}
+        with open('trans.pkl', 'wb') as f:
+            pickle.dump(losses, f)
+
     
     def get_logger(self, opt):
         

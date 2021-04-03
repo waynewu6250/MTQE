@@ -6,6 +6,7 @@ import math
 from models import Model
 from models.utils import apply_packed_sequence, replace_token
 from data.utils import deserialize_vocabs
+from models.transformers import TransformerEncoder
 
 class PositionalEncoding(nn.Module):
     
@@ -75,32 +76,36 @@ class TransformerPredictor(Model):
             opt.target_embeddings_size, 
             opt.hidden_pred
         )
-        self.pos_encoder_source = PositionalEncoding(
-            opt.hidden_pred, 
-            opt.tdropout_pred
-        )
-        self.pos_encoder_target = PositionalEncoding(
-            opt.hidden_pred, 
-            opt.tdropout_pred
-        )
-        self.encoder_layer = nn.TransformerEncoderLayer(
-            d_model=opt.hidden_pred,
-            nhead=opt.nhead,
-            dropout=opt.tdropout_pred
-        )
-        self.forward_decoder_layer = nn.TransformerDecoderLayer(
-            d_model=opt.hidden_pred,
-            nhead=opt.nhead,
-            dropout=opt.tdropout_pred,
-        )
-        self.backward_decoder_layer = nn.TransformerDecoderLayer(
-            d_model=opt.hidden_pred,
-            nhead=opt.nhead,
-            dropout=opt.tdropout_pred,
-        )
-        self.encoder_source = nn.TransformerEncoder(self.encoder_layer, num_layers=opt.transformer_layers_pred)
-        self.forward_decoder_target = nn.TransformerDecoder(self.forward_decoder_layer, num_layers=opt.transformer_layers_pred)
-        self.backward_decoder_target = nn.TransformerDecoder(self.backward_decoder_layer, num_layers=opt.transformer_layers_pred)
+        # self.pos_encoder_source = PositionalEncoding(
+        #     opt.hidden_pred, 
+        #     opt.tdropout_pred
+        # )
+        # self.pos_encoder_target = PositionalEncoding(
+        #     opt.hidden_pred, 
+        #     opt.tdropout_pred
+        # )
+        # self.encoder_layer = nn.TransformerEncoderLayer(
+        #     d_model=opt.hidden_pred,
+        #     nhead=opt.nhead,
+        #     dropout=opt.tdropout_pred
+        # )
+        # self.forward_decoder_layer = nn.TransformerDecoderLayer(
+        #     d_model=opt.hidden_pred,
+        #     nhead=opt.nhead,
+        #     dropout=opt.tdropout_pred,
+        # )
+        # self.backward_decoder_layer = nn.TransformerDecoderLayer(
+        #     d_model=opt.hidden_pred,
+        #     nhead=opt.nhead,
+        #     dropout=opt.tdropout_pred,
+        # )
+        # self.encoder_source = nn.TransformerEncoder(self.encoder_layer, num_layers=opt.transformer_layers_pred)
+        # self.forward_decoder_target = nn.TransformerDecoder(self.forward_decoder_layer, num_layers=opt.transformer_layers_pred)
+        # self.backward_decoder_target = nn.TransformerDecoder(self.backward_decoder_layer, num_layers=opt.transformer_layers_pred)
+
+        self.encoder_source = TransformerEncoder(self.device, opt.hidden_pred, opt.nhead, opt.transformer_layers_pred, opt.tdropout_pred)
+        self.forward_decoder_target = TransformerEncoder(self.device, opt.hidden_pred, opt.nhead, opt.transformer_layers_pred, opt.tdropout_pred)
+        self.backward_decoder_target = TransformerEncoder(self.device, opt.hidden_pred, opt.nhead, opt.transformer_layers_pred, opt.tdropout_pred)
 
         self.W1 = self.embedding_target
         if not opt.share_embeddings:
@@ -228,41 +233,40 @@ class TransformerPredictor(Model):
         # print(target_lengths[0])
         
         source_embeddings = self.embedding_source(source)
-        source_embeddings = self.source_hidden(source_embeddings)*math.sqrt(self.hidden_pred)
-        source_embeddings = self.pos_encoder_source(source_embeddings)
+        source_embeddings = self.source_hidden(source_embeddings)#*math.sqrt(self.hidden_pred)
+        # source_embeddings = self.pos_encoder_source(source_embeddings)
 
         target_embeddings = self.embedding_target(target)
-        target_embeddings = self.target_hidden(target_embeddings)*math.sqrt(self.hidden_pred)
-        target_embeddings = self.pos_encoder_target(target_embeddings)
+        target_embeddings = self.target_hidden(target_embeddings)#*math.sqrt(self.hidden_pred)
+        # target_embeddings = self.pos_encoder_target(target_embeddings)
 
         ################## Transformer process ##################
-        source_embeddings_t = source_embeddings.permute(1,0,2)
-        target_embeddings_t = target_embeddings.permute(1,0,2)
-        target_attention_mask = self.src_mask(target_embeddings_t.shape[0]).to(self.device)
+        # source_embeddings_t = source_embeddings.permute(1,0,2)
+        # target_embeddings_t = target_embeddings.permute(1,0,2)
+        # target_attention_mask = self.src_mask(target_embeddings_t.shape[0]).to(self.device)
 
         # Source Encoding
-        hidden = self.encoder_source(src = source_embeddings_t, 
-                                     src_key_padding_mask = source_mask)
-        # Target Encoding.
-        forward_contexts = self.forward_decoder_target(tgt = target_embeddings_t,
+        hidden = self.encoder_source(source_embeddings, 
+                                     source_mask,
+                                     is_mask = False)
+        # Target Encoding
+        forward_contexts = self.forward_decoder_target(target_embeddings,
+                                                       target_mask,
                                                        memory = hidden,
-                                                       tgt_key_padding_mask = target_mask,
-                                                       memory_key_padding_mask = source_mask
-                                                       )
+                                                       is_mask = True)
         
-        target_emb_rev = self._reverse_padded_seq(target_lengths, target_embeddings).permute(1,0,2)
+        target_emb_rev = self._reverse_padded_seq(target_lengths, target_embeddings)#.permute(1,0,2)
         target_mask_rev = self._reverse_padded_seq(target_lengths, target_mask.unsqueeze(-1)).squeeze(-1)
-        backward_contexts = self.backward_decoder_target(tgt = target_emb_rev, 
+        backward_contexts = self.backward_decoder_target(target_emb_rev, 
+                                                         target_mask_rev,
                                                          memory = hidden,
-                                                         tgt_key_padding_mask = target_mask_rev,
-                                                         memory_key_padding_mask = source_mask
-                                                         )
+                                                         is_mask = True)
         
         ################## Transformer process ##################
 
-        source_contexts = hidden.permute(1,0,2)
-        forward_contexts = forward_contexts.permute(1,0,2)
-        backward_contexts = backward_contexts.permute(1,0,2)
+        source_contexts = hidden#.permute(1,0,2)
+        forward_contexts = forward_contexts#.permute(1,0,2)
+        backward_contexts = backward_contexts#.permute(1,0,2)
         backward_contexts = self._reverse_padded_seq(target_lengths, backward_contexts)
 
         # For each position, concatenate left context i-1 and right context i+1

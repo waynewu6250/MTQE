@@ -10,25 +10,38 @@ Sentence-level Quality Estimation Shared Task of [WMT20](http://www.statmt.org/w
 # To run the codes
 1) Set up configurations in ``config.py``
 2) Type in the following command:
+   >
+         python main.py -m <option> \\
+                        -d <dataset type> \\
+                        -f <data type>
 
->
-    python main.py -m <option> \\
-                   -d <dataset type> \\
-                   -f <data type>
+   Five options: ``train``, ``validate``, ``predict``, ``evaluate``, ``ensemble`` <br>
+   Dataset types: ``train``, ``valid``, `test` <br>
+   Data types: ``*/*.tsv`` for all files in Dataset folder specified above.
 
-Five options: ``train``, ``validate``, ``predict``, ``evaluate``, ``ensemble`` <br>
-Dataset types: ``train``, ``valid``, `test` <br>
-Data types: ``*/*.tsv`` for all files in Dataset folder specified above.
+3) Train predictor first:
 
+   set model_name to be 'BilstmPredictor' or 'TransformerPredictor'
+   >
+         python main.py -m train
 
-3) Or run scripts directly as follows: <br>
+4) Train estimator:
 
->  
-    ** Evaluation **
-    bash run_evaluate.sh
+   set model_name to be 'Estimator' <br>
+   set pre_model_name to be 'BilstmPredictor' or 'TransformerPredictor'
+   set load_pred_source, load_pred_target to be pretrained predictor path
+   >
+         python main.py -m train
+   
 
-    ** Ensemble **
-    bash run_ensemble.sh
+5) Run scripts to evaluate or ensemble as follows: <br>
+
+   >  
+         ** Evaluation **
+         bash run_evaluate.sh
+
+         ** Ensemble **
+         bash run_ensemble.sh
 
 
 
@@ -72,5 +85,11 @@ https://competitions.codalab.org/competitions/24207
    1) Train
    2) Predict
    3) Evaluate
+
+
+Action Item:
+1. transformer
+2. XLMR
+3. other transfer learning techniques
 
 
